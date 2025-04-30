@@ -86,14 +86,14 @@ usage(void)
         fprintf(stderr, "%s -- dhcp lease viewer\n", prog);
         fprintf(stderr, "  usage: %s [-haxvd] [-f file...] [-i ip_addr] [-c client] [-m mac_addr]\n", prog);
         fprintf(stderr, "   -h this help\n");
-	fprintf(stderr, "   -d remove duplicate MAC-leases; show only most recent lease\n");
+        fprintf(stderr, "   -d remove duplicate MAC-leases; show only most recent lease\n");
         fprintf(stderr, "   -c [client] search for client\n");
         fprintf(stderr, "   -i [ip_addr] search for ip address\n");
         fprintf(stderr, "   -m [mac_addr] search for mac address\n");
         fprintf(stderr, "   -f [file] path to dhcp lease file, defaults to %s\n", DEFAULT_LEASE_FILE);
-        fprintf(stderr, "   -a show active leases, mutually exclusive with -x\n");
+        fprintf(stderr, "   -a show all leases, mutually exclusive with -x\n");
         fprintf(stderr, "   -x show expired leases, mutually exclusive with -a\n");
-	fprintf(stderr, "   -v slightly more verbose\n");
+        fprintf(stderr, "   -v slightly more verbose\n");
         exit(EXIT_FAILURE);
 }
 
@@ -136,7 +136,7 @@ static char
 	struct tm tm;
 
 	tbuf = (char *)malloc(128);
-	strftime(tbuf, sizeof(tbuf), "%Y/%m%/%d %H:%M:%S", localtime_r(tt, &tm));
+	strftime(tbuf, sizeof(tbuf), "%y/%m/%d %H:%M:%S", localtime_r(tt, &tm));
 
 	return strtok(asctime_r(&tm, tbuf), "\n");
 }
@@ -153,8 +153,10 @@ string_to_time(const char *datestr)
 
 	if ((err = strptime(datestr, "%Y/%m/%d %H:%M:%S", &tm)) == NULL)
 		error("%s: time conversion failed: %s\n", prog, datestr);
-
-	return mktime(&tm);
+	if (strcmp(tzname[0], "   ") && strcmp(tzname[0], "UTC"))
+		return mktime(&tm);
+	else
+		return timegm(&tm);
 }
 
 
@@ -199,8 +201,7 @@ static int compare_time(const time_t t1, const time_t t2)
 
 /*
  * Filter out any duplicate MAC entries so that only the newest lease
- * for a given MAC address is left in the list of leases. This method
- * works in quadratic time.
+ * for a given MAC address is left in the list of leases.
  */
 static void remove_duplicates(void)
 {
@@ -211,6 +212,8 @@ static void remove_duplicates(void)
 
 	TAILQ_FOREACH(p_cur, &head, entities) {
 		TAILQ_FOREACH(p_cur_sub, &head, entities) {
+			if (p_cur->macaddr == NULL || p_cur_sub->macaddr == NULL)
+				continue;
 			if (strcasecmp(p_cur->macaddr, p_cur_sub->macaddr) == 0) {
 				if (compare_time(p_cur->end, p_cur_sub->end) == -1) {
 					TAILQ_REMOVE(&head, p_cur, entities);
@@ -225,18 +228,16 @@ static void remove_duplicates(void)
  * Format, filter and show output
  */
 static void
-output_leases(const size_t cltlen, const size_t iplen, const size_t maclen, const size_t slen, const size_t elen)
+output_leases(const size_t cltlen, const size_t iplen, const size_t maclen, const size_t elen)
 {
 	int display = 1;
 	struct lease_t *p_cur;
 
-	printf("%-*s%-*s%-*s%-*s%-*s%-*s\n",
+	printf("%-*s%-*s%-*s%-*s\n",
 		(int)cltlen + 2, "CLIENT",
-		(int)iplen  + 2, "IP ADDRESS",
-		(int)maclen + 2, "MAC ADDRESS",
-                (int)slen   + 2, "LEASE START",
-		(int)elen   + 2, "LEASE END",
-		7           + 2, "EXPIRED");
+		(int)iplen  + 1, "IP ADDRESS",
+		(int)maclen + 1, "MAC ADDRESS",
+		(int)elen   + 1, "LEASE END");
 
 	if (TAILQ_EMPTY(&head))
 		return;
@@ -249,19 +250,17 @@ output_leases(const size_t cltlen, const size_t iplen, const size_t maclen, cons
 			display = (match_partial_string(p_cur->client, cval) == 0) ? 1 : 0;
 		if (iflag)
 			display = (match_partial_string(p_cur->ipaddr, ival) == 0) ? 1 : 0;
-		if (aflag)
+		if (!aflag)
 			display = has_lease_expired(p_cur->end) ? 0 : 1;
 		if (xflag)
 			display = has_lease_expired(p_cur->end) ? 1 : 0;
 
 		if (display == 1)
-			printf("%-*s%-*s%-*s%-*s%-*s%-*s\n",
+			printf("%-*s%-*s%-*s%-*s\n",
 				(int)cltlen + 2, p_cur->client,
-				(int)iplen  + 2, p_cur->ipaddr,
-				(int)maclen + 2, p_cur->macaddr,
-				(int)slen   + 2, time_to_string(&p_cur->start),
-				(int)elen   + 2, time_to_string(&p_cur->end),
-				7           + 2, has_lease_expired(p_cur->end) ? "Yes" : "No");
+				(int)iplen  + 1, p_cur->ipaddr,
+				(int)maclen + 1, p_cur->macaddr,
+				(int)elen   + 1, time_to_string(&p_cur->end));
 	}
 }
 
@@ -371,9 +370,9 @@ parse_lease_file(void)
 
 			/* Check if the lease is abandoned */
 			case TOK_ABANDONED:
-				tmp = peek_char();
+				tmp = push_sc();
 				if (tmp != CHAR_SEMICOLON)
-					error("%s: parse error: expected ';' after 'abandoned'\n", prog, buffer);
+					error("%s: parse error: expected ';' after 'abandoned', got '%c'\n", prog, buffer);
 				lbuf->abandoned = 1;
 			default:
 				;
@@ -384,7 +383,7 @@ parse_lease_file(void)
 
 	if (dflag)
 		remove_duplicates();
-	output_leases(len_client, len_ipaddr, len_macaddr, len_start, len_end);
+	output_leases(len_client, len_ipaddr, len_macaddr, len_end);
 }
 
 
@@ -418,24 +417,13 @@ seek_char(const unsigned char chr)
 }
 
 
-/*
- * Take a look at the next character in the byte stream without
- * advancing the pointer
- */
 static int
-peek_char(void)
+push_sc(void)
 {
-	int c, d;
+	int c;
 
-	c = getc(fp);
-	if (feof(fp))
-		return -1;
-
-	d = ungetc(c, fp);
-	if (feof(fp))
-		error("%s: can't peek ahead\n", prog);
-
-	return d;
+	c = ungetc(';', fp);
+	return c;
 }
 
 
@@ -629,20 +617,16 @@ get_token(int *count, int *found)
 		if (c == -1)
 			return 0;
 
-		if (c == -1) {
-			printf("eof reached\n");
+		if (c == -1)
 			break;
-		}
 
 		if (c == '\t' || c == '\n' || c == ';' || isspace(c))
 			break;
 
 		buffer[i++] = c;
 
-		if (c == '#') {
-			printf("goto eol!\n");
+		if (c == '#')
 			continue;
-		}
 
 	}
 	while (1);

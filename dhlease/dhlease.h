@@ -48,7 +48,7 @@ static void   parse_ethernet_address(void);
 static void   parse_client_hostname(void);
 static void   read_string_to_semicolon(void);
 static void   check_block_scope(void);
-static void   output_leases(const size_t cltlen, const size_t iplen, const size_t maclen, const size_t slen, const size_t elen);
+static void   output_leases(const size_t cltlen, const size_t iplen, const size_t maclen, const size_t elen);
 static void   seek_char(const unsigned char chr);
 static char   *time_to_string(const time_t *time);
 static time_t parse_date_string(void);
@@ -59,7 +59,7 @@ static int    get_token(int *count, int *found);
 static int    get_char(void);
 static int    keyword_cmp(const void *p1, const void *p2);
 static int    lookup(char *value);
-static int    peek_char(void);
+static int    push_sc(void);
 static int    error(const char *fmt, ...);
 static int    match_partial_string(const char *src, const char *search);
 

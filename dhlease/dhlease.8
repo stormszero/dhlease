@@ -36,9 +36,8 @@ to an alternative DHCP lease file location given by
 .Va lease_file
 to use instead.
 .It Fl d
-Removes duplicates.  If more than one lease exists for a MAC address,
-the leases will be checked and removed so that only the most recent
-lease for any given MAC address will be shown.
+Show duplicate lease entries.  By default, duplicates are filtered
+out so only the most recent entry is shown.
 .It Fl i
 Search the DHCP leases for an IP-address given by
 .Va ip_addr .
@@ -55,10 +54,10 @@ Search for DHCP leases for a MAC address given by
 You can supply the full MAC address or part of it.  The search is
 case-insensitive.
 .It Fl a
-Display only active DHCP leases. Mutually exclusive with
+Display all DHCP leases regardless of their status.  Mutually exclusive with
 .Fl x .
 .It Fl x
-Display only expired DHCP leases. Mutually exclusive with
+Display only expired DHCP leases.  Mutually exclusive with
 .Fl a .
 .It Fl v
 Slightly more verbose.  Shows which lease file is being used.

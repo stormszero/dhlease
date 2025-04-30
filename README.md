@@ -1,6 +1,13 @@
 # dhlease
 DHCP lease viewer.
 
+# Hiatus
+After a hiatus of almost 7 years I came back around to this as I ultimately forgot I put this here.
+The version initially pushed here wasn't complete and had a few bugs along with it.
+
+As per April 30th 2025 I pushed the version that I am currently using myself.
+I'm not saying this is bug-free but the worst culprits should have been flushed.
+
 # Requirements
 Requires DHCP lease files in the format as specified and used by The Internet Consortium's DHCP server, dhcpd.
 
